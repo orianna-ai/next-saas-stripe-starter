@@ -22,7 +22,8 @@ export default async function DashboardPage() {
         <EmptyPlaceholder.Icon name="post" />
         <EmptyPlaceholder.Title>No content created</EmptyPlaceholder.Title>
         <EmptyPlaceholder.Description>
-          You don&apos;t have any content yet. Start creating content.
+          Drafts will appear here once your first workspace project is
+          published.
         </EmptyPlaceholder.Description>
         <Button>Add Content</Button>
       </EmptyPlaceholder>
