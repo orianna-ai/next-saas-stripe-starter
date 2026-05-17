@@ -18,6 +18,17 @@ export default async function DashboardPage() {
         heading="Dashboard"
         text={`Current Role : ${user?.role} — Change your role in settings.`}
       />
+      <section
+        data-testid="softlight-authjs-dashboard-review-panel"
+        className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm"
+      >
+        <h2 className="text-lg font-semibold">
+          Auth.js dashboard review panel
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Softlight should capture this protected content dashboard surface.
+        </p>
+      </section>
       <EmptyPlaceholder>
         <EmptyPlaceholder.Icon name="post" />
         <EmptyPlaceholder.Title>No content created</EmptyPlaceholder.Title>
