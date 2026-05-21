@@ -1,0 +1,33 @@
+working_directory: .
+# Repo pins Node 16 via .nvmrc, but corepack/pnpm need fetch (Node 18+).
+runtime:
+  node: "20.18.0"
+# env.mjs validates all of these with zod .min(1); dummy values satisfy it so
+# `next dev` boots (the marketing homepage doesn't actually use the services).
+env:
+  AUTH_SECRET: "dummy-secret-for-preview"
+  NEXTAUTH_URL: "http://127.0.0.1:3000"
+  GOOGLE_CLIENT_ID: "dummy"
+  GOOGLE_CLIENT_SECRET: "dummy"
+  GITHUB_OAUTH_TOKEN: "dummy"
+  DATABASE_URL: "postgres://user:pass@localhost:5432/postgres"
+  RESEND_API_KEY: "dummy"
+  EMAIL_FROM: "preview@example.com"
+  STRIPE_API_KEY: "sk_test_dummy"
+  STRIPE_WEBHOOK_SECRET: "whsec_dummy"
+  NEXT_PUBLIC_APP_URL: "http://127.0.0.1:3000"
+  NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PLAN_ID: "price_dummy"
+  NEXT_PUBLIC_STRIPE_PRO_YEARLY_PLAN_ID: "price_dummy"
+  NEXT_PUBLIC_STRIPE_BUSINESS_MONTHLY_PLAN_ID: "price_dummy"
+  NEXT_PUBLIC_STRIPE_BUSINESS_YEARLY_PLAN_ID: "price_dummy"
+install: pnpm install --no-frozen-lockfile
+start: pnpm exec next dev --hostname 127.0.0.1 --port 3000
+port: 3000
+healthcheck: /
+timeout_seconds: 240
+captures:
+  - name: Marketing homepage (PR change)
+    route: /
+    viewport:
+      width: 1440
+      height: 932
