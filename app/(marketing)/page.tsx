@@ -10,6 +10,9 @@ import Testimonials from "@/components/sections/testimonials";
 export default function IndexPage() {
   return (
     <>
+      <div style={{ background: "linear-gradient(90deg,#6d28d9,#db2777)", color: "white", padding: "12px 20px", textAlign: "center", fontWeight: 600 }}>
+        ✨ New in this PR: a friendlier welcome banner — click around the live preview!
+      </div>
       <HeroLanding />
       <PreviewLanding />
       <Powered />

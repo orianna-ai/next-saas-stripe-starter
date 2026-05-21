@@ -1,0 +1,179 @@
+name: Softlight Design Review Capture
+description: Run a PR app locally, capture it with Playwright, and trigger a real-UI design review.
+inputs:
+  config-path:
+    description: Path to the Softlight review config in the checked-out repository.
+    required: false
+    default: .softlight/review.yml
+  softlight-url:
+    description: Base URL for the Softlight API.
+    required: false
+    default: https://softlight.orianna.ai
+  review-endpoint:
+    description: Review endpoint to call after local screenshots are captured.
+    required: false
+    default: /api/review/run
+  capture-plan-endpoint:
+    description: Endpoint used to ask Softlight which PR UI states to capture.
+    required: false
+    default: /api/review/capture-plan
+  review-base-url:
+    description: Optional API base URL override for local smoke tests.
+    required: false
+    default: ""
+  softlight-api-token:
+    description: Optional bearer token for the Softlight API.
+    required: false
+    default: ""
+  capture-mode:
+    description: Capture mode for the review service.
+    required: false
+    default: real
+  skip-capture-plan:
+    description: Use only captures configured in .softlight/review.yml.
+    required: false
+    default: "false"
+  mode:
+    description: Run "capture" for normal PR review, "doctor" for deterministic setup verification, or "agent-doctor" for Claude Code /goal setup repair.
+    required: false
+    default: capture
+  doctor-write:
+    description: Write generated .softlight/review.yml and auth setup files when running in doctor mode.
+    required: false
+    default: "true"
+  doctor-verify:
+    description: Start the app and capture the public route when running in doctor mode.
+    required: false
+    default: "true"
+  doctor-skip-install:
+    description: Skip install commands when running the doctor. Useful for local smoke tests.
+    required: false
+    default: "false"
+  doctor-fail-on-blocker:
+    description: Exit non-zero when the doctor finds auth/setup blockers.
+    required: false
+    default: "false"
+  claude-code-oauth-token:
+    description: Optional CLAUDE_CODE_OAUTH_TOKEN for agent-doctor mode.
+    required: false
+    default: ""
+  anthropic-api-key:
+    description: Optional ANTHROPIC_API_KEY for agent-doctor mode.
+    required: false
+    default: ""
+  anthropic-auth-token:
+    description: Optional ANTHROPIC_AUTH_TOKEN for agent-doctor mode.
+    required: false
+    default: ""
+  claude-model:
+    description: Claude Code model for agent-doctor mode.
+    required: false
+    default: opus
+  claude-effort:
+    description: Claude Code effort level for agent-doctor mode.
+    required: false
+    default: low
+  claude-max-turns:
+    description: Maximum Claude Code turns for the /goal session.
+    required: false
+    default: "1000"
+  claude-permission-mode:
+    description: Claude Code permission mode for agent-doctor mode.
+    required: false
+    default: auto
+  contract-repair-attempts:
+    description: Number of extra Claude runs for repairing invalid capture contracts.
+    required: false
+    default: "2"
+  install-claude-code:
+    description: Install Claude Code in agent-doctor mode when it is missing.
+    required: false
+    default: "true"
+  preview:
+    description: Start a temporary public tunnel to the running app and post a clickable preview link on the PR (capture mode only).
+    required: false
+    default: "false"
+  preview-hold-seconds:
+    description: How long to keep the preview tunnel (and the app) alive after capture, in seconds.
+    required: false
+    default: "1800"
+  github-token:
+    description: Token used to post the preview comment on the PR. Defaults to the workflow github.token (needs pull-requests:write).
+    required: false
+    default: ""
+  review-optional:
+    description: Continue (and still post the preview) when the review POST fails, instead of failing the job. Useful for repos not yet wired to the Softlight API.
+    required: false
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - name: Run Softlight capture runner
+      shell: bash
+      env:
+        SOFTLIGHT_API_TOKEN: ${{ inputs.softlight-api-token }}
+        SOFTLIGHT_BASE_URL: ${{ inputs.softlight-url }}
+        SOFTLIGHT_CAPTURE_PLAN_ENDPOINT: ${{ inputs.capture-plan-endpoint }}
+        SOFTLIGHT_CAPTURE_MODE: ${{ inputs.capture-mode }}
+        SOFTLIGHT_CONFIG_PATH: ${{ inputs.config-path }}
+        SOFTLIGHT_REVIEW_BASE_URL: ${{ inputs.review-base-url }}
+        SOFTLIGHT_REVIEW_ENDPOINT: ${{ inputs.review-endpoint }}
+        SOFTLIGHT_SKIP_CAPTURE_PLAN: ${{ inputs.skip-capture-plan }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        ANTHROPIC_AUTH_TOKEN: ${{ inputs.anthropic-auth-token }}
+        CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-code-oauth-token }}
+        SOFTLIGHT_PREVIEW: ${{ inputs.preview }}
+        SOFTLIGHT_PREVIEW_HOLD_SECONDS: ${{ inputs.preview-hold-seconds }}
+        SOFTLIGHT_REVIEW_OPTIONAL: ${{ inputs.review-optional }}
+        GH_TOKEN: ${{ inputs.github-token || github.token }}
+      run: |
+        SOFTLIGHT_CAPTURE_VENV="${RUNNER_TEMP:-/tmp}/softlight-capture-venv"
+        python3 -m venv "$SOFTLIGHT_CAPTURE_VENV"
+        "$SOFTLIGHT_CAPTURE_VENV/bin/python" -m pip install --quiet --upgrade pip
+        "$SOFTLIGHT_CAPTURE_VENV/bin/python" -m pip install --quiet pyyaml playwright
+        "$SOFTLIGHT_CAPTURE_VENV/bin/python" -m playwright install chromium
+        export PATH="$SOFTLIGHT_CAPTURE_VENV/bin:$PATH"
+        export SOFTLIGHT_CAPTURE_PYTHON="$SOFTLIGHT_CAPTURE_VENV/bin/python"
+        if [[ "${{ inputs.preview }}" == "true" ]]; then
+          echo "softlight: installing cloudflared for the preview tunnel"
+          curl -fsSL -o "$SOFTLIGHT_CAPTURE_VENV/bin/cloudflared" \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x "$SOFTLIGHT_CAPTURE_VENV/bin/cloudflared"
+        fi
+        if [[ "${{ inputs.mode }}" == "agent-doctor" ]]; then
+          AGENT_ARGS=(
+            --config-path "$SOFTLIGHT_CONFIG_PATH"
+            --model "${{ inputs.claude-model }}"
+            --effort "${{ inputs.claude-effort }}"
+            --max-turns "${{ inputs.claude-max-turns }}"
+            --permission-mode "${{ inputs.claude-permission-mode }}"
+            --contract-repair-attempts "${{ inputs.contract-repair-attempts }}"
+          )
+          if [[ "${{ inputs.doctor-skip-install }}" == "true" ]]; then
+            AGENT_ARGS+=(--skip-install)
+          fi
+          if [[ "${{ inputs.doctor-fail-on-blocker }}" == "true" ]]; then
+            AGENT_ARGS+=(--fail-on-blocker)
+          fi
+          if [[ "${{ inputs.install-claude-code }}" == "true" ]]; then
+            AGENT_ARGS+=(--install-claude-code)
+          fi
+          "$SOFTLIGHT_CAPTURE_VENV/bin/python" "$GITHUB_ACTION_PATH/environment_doctor_agent.py" "${AGENT_ARGS[@]}"
+        elif [[ "${{ inputs.mode }}" == "doctor" ]]; then
+          DOCTOR_ARGS=(--config-path "$SOFTLIGHT_CONFIG_PATH")
+          if [[ "${{ inputs.doctor-write }}" == "true" ]]; then
+            DOCTOR_ARGS+=(--write)
+          fi
+          if [[ "${{ inputs.doctor-verify }}" == "true" ]]; then
+            DOCTOR_ARGS+=(--verify)
+          fi
+          if [[ "${{ inputs.doctor-skip-install }}" == "true" ]]; then
+            DOCTOR_ARGS+=(--skip-install)
+          fi
+          if [[ "${{ inputs.doctor-fail-on-blocker }}" == "true" ]]; then
+            DOCTOR_ARGS+=(--fail-on-blocker)
+          fi
+          "$SOFTLIGHT_CAPTURE_VENV/bin/python" "$GITHUB_ACTION_PATH/doctor.py" "${DOCTOR_ARGS[@]}"
+        else
+          "$SOFTLIGHT_CAPTURE_VENV/bin/python" "$GITHUB_ACTION_PATH/capture.py"
+        fi

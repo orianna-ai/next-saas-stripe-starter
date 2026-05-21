@@ -1,0 +1,17 @@
+working_directory: .
+env:
+  SKIP_ENV_VALIDATION: "1"
+  NEXTAUTH_SECRET: "dummy-secret-for-preview"
+  NEXTAUTH_URL: "http://127.0.0.1:3000"
+  AUTH_SECRET: "dummy-secret-for-preview"
+install: pnpm install --no-frozen-lockfile
+start: pnpm exec next dev --hostname 127.0.0.1 --port 3000
+port: 3000
+healthcheck: /
+timeout_seconds: 240
+captures:
+  - name: Marketing homepage (PR change)
+    route: /
+    viewport:
+      width: 1440
+      height: 932
